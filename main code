@@ -1,0 +1,129 @@
+code:
+
+
+import sqlite3
+import random
+
+# seats left
+seats = {"Movie A": 50, "Movie B": 30, "Movie C": 20}
+ticket_price = 200  # per seat
+
+# connect db
+conn = sqlite3.connect("tickets.db")
+cursor = conn.cursor()
+
+# table
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS bookings (
+    ticket_id INTEGER PRIMARY KEY,
+    name TEXT,
+    movie TEXT,
+    seats INTEGER
+)
+""")
+conn.commit()
+
+def book_ticket(name, movie, num_seats):
+    if movie not in seats:
+        return "Movie not found."
+    if num_seats <= 0:
+        return "Invalid seats."
+    if seats[movie] < num_seats:
+        return "Not enough seats."
+
+    seats[movie] -= num_seats
+    ticket_id = random.randint(1000, 9999)
+
+    cursor.execute("INSERT INTO bookings VALUES (?, ?, ?, ?)",
+                   (ticket_id, name, movie, num_seats))
+    conn.commit()
+
+    cost = num_seats * ticket_price
+    return f"Booked!\nID: {ticket_id}\nName: {name}\nMovie: {movie}\nSeats: {num_seats}\nCost: ₹{cost}"
+
+def view_bookings():
+    cursor.execute("SELECT * FROM bookings")
+    rows = cursor.fetchall()
+    print("\n--- Bookings ---")
+    for row in rows:
+        print(row)
+
+def cancel_booking(ticket_id):
+    cursor.execute("SELECT * FROM bookings WHERE ticket_id=?", (ticket_id,))
+    booking = cursor.fetchone()
+    if not booking:
+        return "Ticket not found."
+
+    _, name, movie, num_seats = booking
+    seats[movie] += num_seats
+
+    cursor.execute("DELETE FROM bookings WHERE ticket_id=?", (ticket_id,))
+    conn.commit()
+
+    refund = num_seats * ticket_price
+    return f"Cancelled!\nRefund: ₹{refund}\n{seats[movie]} seats now free in {movie}"
+
+def check_availability():
+    print("\n--- Seats ---")
+    for movie, available in seats.items():
+        print(f"{movie}: {available}")
+
+def search_booking(ticket_id):
+    cursor.execute("SELECT * FROM bookings WHERE ticket_id=?", (ticket_id,))
+    booking = cursor.fetchone()
+    if booking:
+        print("\nFound:", booking)
+    else:
+        print("\nNo booking with that ID.")
+
+# menu loop
+while True:
+    print("\nTicket Booking")
+    print("1. Book")
+    print("2. View")
+    print("3. Cancel")
+    print("4. Check Seats")
+    print("5. Search by ID")
+    print("6. Exit")
+
+    choice = input("Choice: ")
+
+    if choice == "1":
+        name = input("Name: ")
+        print("Movies:", list(seats.keys()))
+        movie = input("Movie: ")
+        try:
+            num_seats = int(input("Seats: "))
+        except ValueError:
+            print("Enter a number.")
+            continue
+        print(book_ticket(name, movie, num_seats))
+
+    elif choice == "2":
+        view_bookings()
+
+    elif choice == "3":
+        try:
+            ticket_id = int(input("Ticket ID: "))
+            print(cancel_booking(ticket_id))
+        except ValueError:
+            print("Invalid ID.")
+
+    elif choice == "4":
+        check_availability()
+
+    elif choice == "5":
+        try:
+            ticket_id = int(input("Ticket ID: "))
+            search_booking(ticket_id)
+        except ValueError:
+            print("Invalid ID.")
+
+    elif choice == "6":
+        print("Bye!")
+        break
+
+    else:
+        print("Wrong choice.")
+
+conn.close()
